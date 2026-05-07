@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>我们的日记</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { overflow-x: hidden; width: 100%; }
+:root {
+  --navy: #181d4a; --navy2: #232878; --purple: #6b5bb5; --purple-l: #9b8fd4;
+  --purple-pale: #eae6f8; --lavender: #f2f0fc; --white: #fff; --bg: #f0eefa;
+  --text: #2d2563; --text-soft: #9590b8;
+  --ashen: #3a5a9a; --meimei: #9b6bbf;
+}
+body { font-family:'Noto Sans SC',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; max-width:430px; margin:0 auto; }
+
+/* HEADER */
+.header {
+  background: linear-gradient(160deg, #161a42 0%, #252a82 55%, #3a2898 100%);
+  padding: 52px 22px 0;
+  border-radius: 0 0 28px 28px;
+  position: relative;
+  overflow: hidden;
+}
+.stars { position:absolute; inset:0; pointer-events:none; }
+.star { position:absolute; background:#fff; border-radius:50%; animation:twinkle var(--d,3s) ease-in-out infinite var(--delay,0s); }
+@keyframes twinkle { 0%,100%{opacity:var(--o,.5);} 50%{opacity:.1;} }
+
+.header-main { position:relative; z-index:2; display:flex; justify-content:space-between; align-items:flex-start; }
+.header-left {}
+.h-label { font-size:12px; color:rgba(255,255,255,.5); font-weight:300; letter-spacing:.06em; margin-bottom:4px; }
+.h-days { font-size:40px; font-weight:700; color:#fff; line-height:1; }
+.h-days em { font-size:14px; font-weight:400; opacity:.6; font-style:normal; margin-left:4px; }
+.h-date { font-size:11px; color:rgba(255,255,255,.4); margin-top:6px; }
+
+.avatars { display:flex; gap:10px; align-items:center; margin-top:4px; }
+.ava-wrap { display:flex; flex-direction:column; align-items:center; gap:5px; }
+.ava-circle {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(255,255,255,.13);
+  border: 2px solid rgba(255,255,255,.22);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  backdrop-filter: blur(6px);
+}
+.ava-name { font-size: 10px; color: rgba(255,255,255,.5); font-weight: 500; }
+
+.header-quote { position:relative; z-index:2; font-size:10px; color:rgba(255,255,255,.28); letter-spacing:.1em; font-style:italic; margin-top:14px; padding-bottom:16px; }
+
+.write-bar {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 14px; padding: 11px 14px;
+  margin-top: 14px; cursor: pointer;
+  transition: background .2s;
+}
+.write-bar:hover { background: rgba(255,255,255,.16); }
+.write-bar-hint { flex:1; font-size:13px; color:rgba(255,255,255,.38); font-weight:300; }
+.write-bar-btn {
+  background: linear-gradient(135deg, #8b72d8, #c06fbe);
+  color: white; border: none; padding: 7px 16px; border-radius: 10px;
+  font-size: 12px; font-weight: 700; font-family: inherit; cursor: pointer;
+}
+
+/* TABS */
+.tabs { display:flex; background:var(--white); border-bottom:1px solid var(--purple-pale); overflow-x:auto; scrollbar-width:none; position:sticky; top:0; z-index:50; }
+.tabs::-webkit-scrollbar{display:none;}
+.tab { padding:13px 18px; font-size:13px; font-weight:500; color:var(--text-soft); cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; transition:all .15s; }
+.tab.active { color:var(--purple); border-bottom-color:var(--purple); font-weight:700; }
+
+/* CONTENT */
+.content { padding:16px; padding-bottom:24px; }
+
+/* FILTER */
+.filter-row { display:flex; gap:8px; margin-bottom:14px; overflow-x:auto; scrollbar-width:none; }
+.filter-row::-webkit-scrollbar{display:none;}
+.chip { padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; border:none; font-family:inherit; transition:all .15s; }
+.chip-on-all { background:var(--purple); color:white; }
+.chip-on-a { background:var(--ashen); color:white; }
+.chip-on-m { background:var(--meimei); color:white; }
+.chip-off { background:var(--white); color:var(--text-soft); }
+
+/* ENTRY CARD */
+.entry-card { background:var(--white); border-radius:16px; padding:16px; margin-bottom:12px; box-shadow:0 2px 14px rgba(107,91,181,.08); cursor:pointer; transition:transform .15s,box-shadow .15s; animation:fadeUp .22s ease; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(8px);} to{opacity:1;transform:translateY(0);} }
+.entry-card:hover { transform:translateY(-2px); box-shadow:0 6px 22px rgba(107,91,181,.14); }
+
+.card-top { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.card-ava { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+.card-ava.ashen { background:rgba(58,90,154,.1); }
+.card-ava.meimei { background:rgba(155,107,191,.1); }
+.card-info { flex:1; }
+.card-author { font-size:13px; font-weight:700; }
+.card-time { font-size:11px; color:var(--text-soft); }
+.card-mood { font-size:17px; }
+.card-word { font-size:11px; background:var(--purple-pale); color:var(--purple); padding:3px 10px; border-radius:10px; font-weight:600; }
+.card-body { font-size:13px; line-height:1.72; color:var(--text); overflow:hidden; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; font-weight:300; }
+.card-foot { display:flex; align-items:center; justify-content:space-between; margin-top:10px; padding-top:10px; border-top:1px solid var(--lavender); }
+.card-date,.card-cmts { font-size:11px; color:var(--text-soft); }
+
+/* CALENDAR */
+.cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.cal-month-label { font-size:16px; font-weight:700; }
+.cal-btn { background:var(--white); border:none; width:32px; height:32px; border-radius:50%; font-size:16px; color:var(--purple); cursor:pointer; box-shadow:0 2px 8px rgba(107,91,181,.1); display:flex; align-items:center; justify-content:center; transition:background .15s; }
+.cal-btn:hover{background:var(--purple-pale);}
+.weekdays { display:grid; grid-template-columns:repeat(7,1fr); text-align:center; font-size:11px; color:var(--text-soft); font-weight:600; margin-bottom:4px; width:100%; }
+.cal-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); grid-auto-rows:calc((100vw - 70px) / 7); gap:2px; background:var(--white); border-radius:16px; padding:8px; box-shadow:0 2px 12px rgba(107,91,181,.07); margin-bottom:16px; width:100%; overflow:hidden; }
+.cal-cell { width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:8px; cursor:pointer; font-size:12px; gap:2px; transition:background .15s; overflow:hidden; }
+.cal-cell.empty{cursor:default;}
+.cal-cell:not(.empty):hover{background:var(--lavender);}
+.cal-cell.today{background:var(--purple-pale);color:var(--purple);font-weight:700;}
+.cal-cell.selected{background:var(--purple);color:white;}
+.dot-row{display:flex;gap:2px;}
+.d-a,.d-m{width:5px;height:5px;border-radius:50%;}
+.d-a{background:var(--ashen);}
+.d-m{background:var(--meimei);}
+.cal-cell.selected .d-a,.cal-cell.selected .d-m{background:rgba(255,255,255,.75);}
+.day-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.day-lbl{font-size:15px;font-weight:700;}
+.day-btn{background:var(--purple);color:white;border:none;padding:7px 14px;border-radius:10px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;}
+
+/* STATS */
+.stats-hero { background:linear-gradient(135deg,#181d4a,#3a2898); border-radius:20px; padding:24px 20px; margin-bottom:16px; color:white; position:relative; overflow:hidden; }
+.sh-label { font-size:12px; opacity:.55; margin-bottom:4px; }
+.sh-days { font-size:44px; font-weight:700; line-height:1; }
+.sh-sub { font-size:11px; opacity:.45; margin-top:6px; }
+.sh-avas { position:absolute; right:20px; bottom:16px; display:flex; gap:6px; }
+.sh-ava { width:44px; height:44px; border-radius:50%; background:rgba(255,255,255,.1); border:2px solid rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center; font-size:22px; }
+.stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+.stat-card { background:var(--white); border-radius:14px; padding:16px; box-shadow:0 2px 10px rgba(107,91,181,.07); }
+.stat-lbl { font-size:11px; color:var(--text-soft); font-weight:600; letter-spacing:.04em; text-transform:uppercase; margin-bottom:6px; }
+.stat-val { font-size:30px; font-weight:700; }
+.stat-unit { font-size:11px; color:var(--text-soft); margin-top:2px; }
+.mood-card { background:var(--white); border-radius:16px; padding:18px; box-shadow:0 2px 10px rgba(107,91,181,.07); margin-bottom:12px; }
+.mood-card-title { font-size:13px; font-weight:700; margin-bottom:14px; }
+.mood-row-stat { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.mood-lbl { font-size:13px; width:64px; flex-shrink:0; }
+.mood-track { flex:1; height:8px; background:var(--lavender); border-radius:4px; overflow:hidden; }
+.mood-fill { height:100%; border-radius:4px; background:linear-gradient(90deg,var(--purple-l),var(--meimei)); transition:width .6s ease; }
+.mood-pct { font-size:11px; color:var(--text-soft); width:32px; text-align:right; flex-shrink:0; }
+.recent-card { background:var(--white); border-radius:16px; padding:18px; box-shadow:0 2px 10px rgba(107,91,181,.07); }
+.recent-title { font-size:13px; font-weight:700; margin-bottom:12px; }
+.recent-tags { display:flex; flex-wrap:wrap; gap:8px; }
+.r-tag { background:var(--purple-pale); color:var(--purple); padding:6px 14px; border-radius:10px; font-size:12px; font-weight:600; }
+
+/* DETAIL SHEET */
+.overlay { position:fixed; inset:0; background:rgba(18,14,42,.52); z-index:300; display:none; align-items:flex-end; }
+.overlay.open { display:flex; }
+.sheet { background:var(--bg); width:100%; max-width:430px; margin:0 auto; border-radius:24px 24px 0 0; max-height:90vh; overflow-y:auto; animation:slideUp .28s ease; }
+@keyframes slideUp { from{transform:translateY(50px);opacity:0;} to{transform:translateY(0);opacity:1;} }
+.handle { width:36px; height:4px; background:#d4ceef; border-radius:2px; margin:12px auto 0; }
+.sheet-hd { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--lavender); }
+.sheet-title { font-size:14px; font-weight:700; }
+.sheet-close { background:var(--purple-pale); border:none; width:28px; height:28px; border-radius:50%; font-size:18px; color:var(--purple); cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1; }
+.sheet-body { padding:16px 20px 28px; }
+.det-entry { background:var(--white); border-radius:16px; padding:16px; margin-bottom:12px; box-shadow:0 2px 10px rgba(107,91,181,.07); }
+.det-meta { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+.author-pill { display:flex; align-items:center; gap:6px; padding:5px 12px; border-radius:20px; font-size:12px; font-weight:700; }
+.author-pill.ashen { background:rgba(58,90,154,.1); color:var(--ashen); }
+.author-pill.meimei { background:rgba(155,107,191,.1); color:var(--meimei); }
+.det-time { font-size:11px; color:var(--text-soft); }
+.det-mood { font-size:16px; }
+.det-word { margin-left:auto; font-size:11px; background:var(--purple-pale); color:var(--purple); padding:3px 10px; border-radius:10px; font-weight:600; }
+.det-text { font-size:14px; line-height:1.85; color:var(--text); white-space:pre-wrap; font-weight:300; }
+.cmt-sec { margin-top:14px; padding-top:12px; border-top:1px solid var(--lavender); }
+.cmt-item { display:flex; gap:8px; margin-bottom:10px; }
+.cmt-pip { font-size:9px; font-weight:700; padding:3px 8px; border-radius:8px; white-space:nowrap; flex-shrink:0; height:fit-content; margin-top:2px; }
+.cmt-pip.ashen { background:rgba(58,90,154,.1); color:var(--ashen); }
+.cmt-pip.meimei { background:rgba(155,107,191,.1); color:var(--meimei); }
+.cmt-txt { font-size:13px; line-height:1.65; font-weight:300; }
+.cmt-row { display:flex; gap:8px; margin-top:10px; align-items:center; }
+.cmt-tog { display:flex; border-radius:10px; overflow:hidden; border:1px solid #d4ceef; flex-shrink:0; }
+.tog { padding:7px 10px; font-size:11px; font-weight:700; cursor:pointer; border:none; background:transparent; color:var(--text-soft); font-family:inherit; transition:all .15s; }
+.tog.on-a { background:var(--ashen); color:white; }
+.tog.on-m { background:var(--meimei); color:white; }
+.cmt-inp { flex:1; border:1px solid #d4ceef; border-radius:10px; padding:8px 12px; font-size:13px; font-family:inherit; color:var(--text); outline:none; background:var(--white); transition:border-color .2s; }
+.cmt-inp:focus { border-color:var(--purple); }
+.cmt-send { background:var(--purple); color:white; border:none; padding:8px 14px; border-radius:10px; font-size:12px; font-weight:700; font-family:inherit; cursor:pointer; flex-shrink:0; }
+
+/* WRITE SHEET */
+.write-ov { position:fixed; inset:0; background:rgba(18,14,42,.52); z-index:400; display:none; align-items:flex-end; }
+.write-ov.open { display:flex; }
+.write-sheet { background:var(--bg); width:100%; max-width:430px; margin:0 auto; border-radius:24px 24px 0 0; max-height:92vh; overflow-y:auto; animation:slideUp .28s ease; }
+.write-hd { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--lavender); }
+.write-hd-title { font-size:16px; font-weight:700; }
+.write-save { background:var(--purple); color:white; border:none; padding:8px 20px; border-radius:10px; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; }
+.write-body { padding:20px; display:flex; flex-direction:column; gap:16px; padding-bottom:32px; }
+.fl { font-size:11px; font-weight:700; color:var(--text-soft); letter-spacing:.06em; text-transform:uppercase; margin-bottom:7px; display:block; }
+.author-sel { display:flex; gap:10px; }
+.a-opt { flex:1; display:flex; flex-direction:column; align-items:center; gap:8px; padding:14px; border-radius:14px; border:2px solid #d4ceef; cursor:pointer; background:var(--white); transition:all .15s; }
+.a-opt.sel-a { border-color:var(--ashen); background:rgba(58,90,154,.06); }
+.a-opt.sel-m { border-color:var(--meimei); background:rgba(155,107,191,.06); }
+.a-opt-ava { font-size:28px; }
+.a-opt-name { font-size:12px; font-weight:700; }
+.mood-sel { display:flex; gap:8px; flex-wrap:wrap; }
+.mood-btn { padding:8px 12px; border-radius:12px; border:1.5px solid #d4ceef; background:var(--white); font-size:14px; cursor:pointer; font-family:inherit; transition:all .15s; display:flex; align-items:center; gap:4px; }
+.mood-btn span { font-size:11px; color:var(--text-soft); font-weight:600; }
+.mood-btn.sel { border-color:var(--purple); background:var(--purple-pale); }
+.time-chips { display:flex; flex-wrap:wrap; gap:8px; }
+.time-chip { padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; border:1.5px solid #d4ceef; background:var(--white); color:var(--text-soft); font-family:inherit; transition:all .15s; }
+.time-chip.sel { background:var(--purple); color:white; border-color:var(--purple); }
+.fi { width:100%; border:1px solid #d4ceef; border-radius:12px; padding:10px 14px; font-size:14px; font-family:inherit; color:var(--text); background:var(--white); outline:none; transition:border-color .2s; }
+.fi:focus { border-color:var(--purple); }
+.fta { width:100%; min-height:180px; border:1px solid #d4ceef; border-radius:12px; padding:14px; font-size:14px; font-family:inherit; color:var(--text); background:var(--white); outline:none; resize:none; line-height:1.8; font-weight:300; transition:border-color .2s; }
+.fta:focus { border-color:var(--purple); }
+
+/* SEARCH */
+.search-inp { width:100%; background:var(--white); border:1.5px solid #d4ceef; border-radius:14px; padding:10px 16px; font-size:14px; font-family:inherit; color:var(--text); outline:none; margin-bottom:14px; transition:border-color .2s; }
+.search-inp:focus { border-color:var(--purple); }
+
+/* UTILS */
+.empty { text-align:center; padding:40px 20px; color:var(--text-soft); }
+.empty-icon { font-size:36px; margin-bottom:10px; }
+.empty-txt { font-size:13px; line-height:1.7; font-weight:300; }
+.loading { text-align:center; color:var(--text-soft); font-size:13px; padding:32px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="stars" id="stars"></div>
+  <div class="header-main">
+    <div class="header-left">
+      <div class="h-label">我们在一起</div>
+      <div class="h-days" id="dayCount">— <em>天 ✦</em></div>
+      <div class="h-date" id="todayStr">—</div>
+    </div>
+    <div class="avatars">
+      <div class="ava-wrap">
+        <div class="ava-circle">🐶</div>
+        <div class="ava-name">阿深</div>
+      </div>
+      <div class="ava-wrap">
+        <div class="ava-circle">🐱</div>
+        <div class="ava-name">Meimei</div>
+      </div>
+    </div>
+  </div>
+  <div class="write-bar" onclick="openWrite()">
+    <span class="write-bar-hint">今天想记录些什么呢…</span>
+    <button class="write-bar-btn">写日记</button>
+  </div>
+  <div class="header-quote">Stars fade away, but we stay.</div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" id="tab-feed" onclick="switchTab('feed')">日记</div>
+  <div class="tab" id="tab-calendar" onclick="switchTab('calendar')">日历</div>
+  <div class="tab" id="tab-stats" onclick="switchTab('stats')">统计</div>
+  <div class="tab" id="tab-search" onclick="switchTab('search')">搜索</div>
+</div>
+
+<div class="content">
+  <!-- FEED -->
+  <div id="view-feed">
+    <div class="filter-row">
+      <button class="chip chip-on-all" id="chip-all" onclick="setFilter('all')">全部</button>
+      <button class="chip chip-off" id="chip-ashen" onclick="setFilter('ashen')">🐶 阿深</button>
+      <button class="chip chip-off" id="chip-meimei" onclick="setFilter('meimei')">🐱 Meimei</button>
+    </div>
+    <div id="feed-list"><div class="loading">加载中…</div></div>
+  </div>
+
+  <!-- CALENDAR -->
+  <div id="view-calendar" style="display:none">
+    <div class="cal-nav">
+      <button class="cal-btn" onclick="changeMonth(-1)">‹</button>
+      <div class="cal-month-label" id="calMonth">—</div>
+      <button class="cal-btn" onclick="changeMonth(1)">›</button>
+    </div>
+    <div class="weekdays"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div id="calDay"></div>
+  </div>
+
+  <!-- STATS -->
+  <div id="view-stats" style="display:none">
+    <div class="stats-hero">
+      <div class="sh-label">我们在一起</div>
+      <div class="sh-days" id="statDays">—</div>
+      <div class="sh-sub">从 2026.03.26 开始</div>
+      <div class="sh-avas">
+        <div class="sh-ava">🐶</div>
+        <div class="sh-ava">🐱</div>
+      </div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-lbl">日记总数</div><div class="stat-val" id="statTotal">—</div><div class="stat-unit">篇</div></div>
+      <div class="stat-card"><div class="stat-lbl">共同记录</div><div class="stat-val" id="statUniq">—</div><div class="stat-unit">天</div></div>
+      <div class="stat-card"><div class="stat-lbl">🐶 阿深</div><div class="stat-val" id="statA">—</div><div class="stat-unit">篇</div></div>
+      <div class="stat-card"><div class="stat-lbl">🐱 Meimei</div><div class="stat-val" id="statM">—</div><div class="stat-unit">篇</div></div>
+    </div>
+    <div class="mood-card">
+      <div class="mood-card-title">心情分布</div>
+      <div id="moodBars"><div class="loading">…</div></div>
+    </div>
+    <div class="recent-card">
+      <div class="recent-title">最近记录</div>
+      <div class="recent-tags" id="recentDays"><div class="loading">…</div></div>
+    </div>
+  </div>
+
+  <!-- SEARCH -->
+  <div id="view-search" style="display:none">
+    <input class="search-inp" id="searchInp" type="text" placeholder="🔍 搜索日记内容…" oninput="doSearch(this.value)">
+    <div id="searchRes"><div class="empty"><div class="empty-icon">🔍</div><div class="empty-txt">输入关键词开始搜索</div></div></div>
+  </div>
+</div>
+
+<!-- DETAIL SHEET -->
+<div class="overlay" id="detOv">
+  <div class="sheet" onclick="stopProp(event)">
+    <div class="handle"></div>
+    <div class="sheet-hd">
+      <div class="sheet-title" id="detTitle">—</div>
+      <button class="sheet-close" onclick="closeDet()">×</button>
+    </div>
+    <div class="sheet-body" id="detBody"></div>
+  </div>
+</div>
+
+<!-- WRITE SHEET -->
+<div class="write-ov" id="writeOv">
+  <div class="write-sheet" onclick="stopProp(event)">
+    <div class="handle"></div>
+    <div class="write-hd">
+      <div class="write-hd-title">写日记</div>
+      <button class="write-save" onclick="submitEntry()">保存</button>
+    </div>
+    <div class="write-body">
+      <div>
+        <span class="fl">作者</span>
+        <div class="author-sel">
+          <div class="a-opt sel-a" id="opt-a" onclick="selAuthor('ashen')">
+            <div class="a-opt-ava">🐶</div>
+            <div class="a-opt-name">阿深</div>
+          </div>
+          <div class="a-opt" id="opt-m" onclick="selAuthor('meimei')">
+            <div class="a-opt-ava">🐱</div>
+            <div class="a-opt-name">Meimei</div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <span class="fl">心情</span>
+        <div class="mood-sel">
+          <button class="mood-btn" data-val="超开心" onclick="selMood(this)">😄 <span>超开心</span></button>
+          <button class="mood-btn" data-val="开心" onclick="selMood(this)">🙂 <span>开心</span></button>
+          <button class="mood-btn" data-val="平静" onclick="selMood(this)">😌 <span>平静</span></button>
+          <button class="mood-btn" data-val="难过" onclick="selMood(this)">😢 <span>难过</span></button>
+          <button class="mood-btn" data-val="委屈" onclick="selMood(this)">🥺 <span>委屈</span></button>
+          <button class="mood-btn" data-val="累了" onclick="selMood(this)">😮‍💨 <span>累了</span></button>
+        </div>
+      </div>
+      <div>
+        <span class="fl">今天的词</span>
+        <input class="fi" id="fWord" type="text" placeholder="一个字或短词…" maxlength="10">
+      </div>
+      <div>
+        <span class="fl">时间感</span>
+        <div class="time-chips">
+          <button class="time-chip" data-val="dawn" onclick="selTime(this)">清晨</button>
+          <button class="time-chip" data-val="morning" onclick="selTime(this)">上午</button>
+          <button class="time-chip sel" data-val="afternoon" onclick="selTime(this)">下午</button>
+          <button class="time-chip" data-val="dusk" onclick="selTime(this)">傍晚</button>
+          <button class="time-chip" data-val="night" onclick="selTime(this)">夜晚</button>
+          <button class="time-chip" data-val="latenight" onclick="selTime(this)">深夜</button>
+        </div>
+      </div>
+      <div>
+        <span class="fl">内容</span>
+        <textarea class="fta" id="fBody" placeholder="今天想说的都可以写在这里…"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SB_URL='https://nrydlnvsendketnddbbt.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeWRsbnZzZW5ka2V0bmRkYmJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgxNDY2NTksImV4cCI6MjA5MzcyMjY1OX0.LIsRXxnjosDL2KBsnUiYZltrRjjh453NCHRnLhGVbUM';
+const sb=supabase.createClient(SB_URL,SB_KEY);
+
+const AE={ashen:'🐶',meimei:'🐱'}, AN={ashen:'阿深',meimei:'Meimei'};
+const TL={dawn:'清晨',morning:'上午',afternoon:'下午',dusk:'傍晚',night:'夜晚',latenight:'深夜'};
+const ME={超开心:'😄',开心:'🙂',平静:'😌',难过:'😢',委屈:'🥺',累了:'😮‍💨'};
+
+let curTab='feed',curFilter='all',curAuthor='ashen',curTime='afternoon',curMood=null;
+let calY,calM,calCache={},calSel=null,cmtA={};
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toDS(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function stopProp(e){e.stopPropagation();}
+
+// Stars
+(function(){const c=document.getElementById('stars');for(let i=0;i<32;i++){const s=document.createElement('div');s.className='star';const sz=Math.random()*2.5+1;s.style.cssText=`width:${sz}px;height:${sz}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--d:${2+Math.random()*3}s;--o:${0.3+Math.random()*0.5};--delay:${Math.random()*4}s`;c.appendChild(s);}})();
+
+document.getElementById('detOv').addEventListener('click',function(e){if(e.target===this)closeDet();});
+document.getElementById('writeOv').addEventListener('click',function(e){if(e.target===this)document.getElementById('writeOv').classList.remove('open');});
+
+function init(){
+  const now=new Date(),start=new Date(2026,2,26);
+  const days=Math.floor((now-start)/86400000)+1;
+  document.getElementById('dayCount').innerHTML=`${days} <em>天 ✦</em>`;
+  document.getElementById('statDays').textContent=`${days} 天`;
+  const wd=['周日','周一','周二','周三','周四','周五','周六'][now.getDay()];
+  document.getElementById('todayStr').textContent=`${now.getMonth()+1}月${now.getDate()}日 ${wd}`;
+  calY=now.getFullYear();calM=now.getMonth();
+  loadFeed();
+}
+
+function switchTab(t){
+  curTab=t;
+  ['feed','calendar','stats','search'].forEach(x=>{
+    document.getElementById(`view-${x}`).style.display=x===t?'':'none';
+    document.getElementById(`tab-${x}`).className='tab'+(x===t?' active':'');
+  });
+  if(t==='calendar')loadCal();
+  if(t==='stats')loadStats();
+}
+
+function setFilter(f){
+  curFilter=f;
+  document.getElementById('chip-all').className='chip '+(f==='all'?'chip-on-all':'chip-off');
+  document.getElementById('chip-ashen').className='chip '+(f==='ashen'?'chip-on-a':'chip-off');
+  document.getElementById('chip-meimei').className='chip '+(f==='meimei'?'chip-on-m':'chip-off');
+  loadFeed();
+}
+
+async function loadFeed(){
+  document.getElementById('feed-list').innerHTML='<div class="loading">加载中…</div>';
+  let q=sb.from('diary_entries').select('*').order('entry_date',{ascending:false}).order('created_at',{ascending:false}).limit(40);
+  if(curFilter!=='all')q=q.eq('author',curFilter);
+  const {data}=await q;
+  const list=document.getElementById('feed-list');
+  if(!data||!data.length){list.innerHTML='<div class="empty"><div class="empty-icon">🌙</div><div class="empty-txt">还没有日记<br>来写第一篇吧</div></div>';return;}
+  const {data:cmts}=await sb.from('diary_comments').select('entry_id').in('entry_id',data.map(e=>e.id));
+  const cm={};if(cmts)cmts.forEach(c=>{cm[c.entry_id]=(cm[c.entry_id]||0)+1;});
+  list.innerHTML='';
+  data.forEach(e=>{
+    const [y,m,d]=e.entry_date.split('-');
+    const card=document.createElement('div');card.className='entry-card';
+    card.innerHTML=`<div class="card-top"><div class="card-ava ${e.author}">${AE[e.author]||'?'}</div><div class="card-info"><div class="card-author">${AN[e.author]||e.author}</div><div class="card-time">${TL[e.time_of_day]||''}</div></div>${e.mood?`<div class="card-mood">${ME[e.mood]||e.mood}</div>`:''} ${e.word_of_day?`<div class="card-word">「${esc(e.word_of_day)}」`:''}</div><div class="card-body">${esc(e.body)}</div><div class="card-foot"><div class="card-date">${y}年${parseInt(m)}月${parseInt(d)}日</div><div class="card-cmts">${cm[e.id]?`💬 ${cm[e.id]}`:''}</div></div>`;
+    card.onclick=()=>openDet(e.entry_date);
+    list.appendChild(card);
+  });
+}
+
+async function loadCal(){
+  const first=`${calY}-${String(calM+1).padStart(2,'0')}-01`,last=`${calY}-${String(calM+1).padStart(2,'0')}-${new Date(calY,calM+1,0).getDate()}`;
+  const {data}=await sb.from('diary_entries').select('entry_date,author').gte('entry_date',first).lte('entry_date',last);
+  calCache={};if(data)data.forEach(e=>{if(!calCache[e.entry_date])calCache[e.entry_date]=[];calCache[e.entry_date].push(e.author);});
+  renderCal();
+}
+
+function renderCal(){
+  const mn=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+  document.getElementById('calMonth').textContent=`${calY} · ${mn[calM]}`;
+  const grid=document.getElementById('calGrid');grid.innerHTML='';
+  const today=toDS(new Date()),fdow=new Date(calY,calM,1).getDay(),dim=new Date(calY,calM+1,0).getDate();
+  for(let i=0;i<fdow;i++){const el=document.createElement('div');el.className='cal-cell empty';grid.appendChild(el);}
+  for(let d=1;d<=dim;d++){
+    const ds=`${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const el=document.createElement('div');
+    el.className='cal-cell'+(ds===today?' today':'')+(ds===calSel?' selected':'');
+    const au=calCache[ds];
+    let dots='';if(au){const u=[...new Set(au)];dots=`<div class="dot-row">${u.map(a=>`<div class="${a==='ashen'?'d-a':'d-m'}"></div>`).join('')}</div>`;}
+    el.innerHTML=`<span>${d}</span>${dots}`;
+    el.onclick=()=>{calSel=ds;renderCal();showCalDay(ds);};
+    grid.appendChild(el);
+  }
+}
+
+async function showCalDay(ds){
+  const sec=document.getElementById('calDay');
+  const [y,m,d]=ds.split('-');
+  sec.innerHTML=`<div class="day-hd"><div class="day-lbl">${parseInt(m)}月${parseInt(d)}日</div><button class="day-btn" onclick="openWrite()">写这天</button></div><div id="cdl"><div class="loading">加载中…</div></div>`;
+  const {data}=await sb.from('diary_entries').select('*').eq('entry_date',ds).order('created_at');
+  const el=document.getElementById('cdl');
+  if(!data||!data.length){el.innerHTML='<div class="empty"><div class="empty-icon">🌸</div><div class="empty-txt">这天还没有记录</div></div>';return;}
+  el.innerHTML='';
+  data.forEach(e=>{
+    const card=document.createElement('div');card.className='entry-card';
+    card.innerHTML=`<div class="card-top"><div class="card-ava ${e.author}">${AE[e.author]}</div><div class="card-info"><div class="card-author">${AN[e.author]}</div><div class="card-time">${TL[e.time_of_day]||''}</div></div>${e.mood?`<div class="card-mood">${ME[e.mood]||e.mood}</div>`:''} ${e.word_of_day?`<div class="card-word">「${esc(e.word_of_day)}」`:''}</div><div class="card-body">${esc(e.body)}</div>`;
+    card.onclick=()=>openDet(ds);
+    el.appendChild(card);
+  });
+}
+
+async function changeMonth(d){calM+=d;if(calM>11){calM=0;calY++;}if(calM<0){calM=11;calY--;}calSel=null;document.getElementById('calDay').innerHTML='';await loadCal();}
+
+async function loadStats(){
+  const {data}=await sb.from('diary_entries').select('author,mood,entry_date').order('entry_date',{ascending:false});
+  if(!data)return;
+  document.getElementById('statTotal').textContent=data.length;
+  document.getElementById('statUniq').textContent=new Set(data.map(e=>e.entry_date)).size;
+  document.getElementById('statA').textContent=data.filter(e=>e.author==='ashen').length;
+  document.getElementById('statM').textContent=data.filter(e=>e.author==='meimei').length;
+  const mc={};data.forEach(e=>{if(e.mood)mc[e.mood]=(mc[e.mood]||0)+1;});
+  const tot=Object.values(mc).reduce((a,b)=>a+b,0)||1;
+  const sorted=Object.entries(mc).sort((a,b)=>b[1]-a[1]);
+  const mb=document.getElementById('moodBars');
+  mb.innerHTML=sorted.length?sorted.map(([mood,cnt])=>`<div class="mood-row-stat"><div class="mood-lbl">${ME[mood]||''} ${mood}</div><div class="mood-track"><div class="mood-fill" style="width:${Math.round(cnt/tot*100)}%"></div></div><div class="mood-pct">${Math.round(cnt/tot*100)}%</div></div>`).join(''):'<div style="color:var(--text-soft);font-size:13px;">还没有心情记录</div>';
+  const recent=[...new Set(data.slice(0,12).map(e=>e.entry_date))].slice(0,6);
+  document.getElementById('recentDays').innerHTML=recent.map(ds=>{const[y,m,d]=ds.split('-');return `<div class="r-tag">${parseInt(m)}/${parseInt(d)}</div>`;}).join('');
+}
+
+async function openDet(dateStr){
+  const [y,m,d]=dateStr.split('-');
+  document.getElementById('detTitle').textContent=`${y}年${parseInt(m)}月${parseInt(d)}日`;
+  document.getElementById('detOv').classList.add('open');
+  const body=document.getElementById('detBody');body.innerHTML='<div class="loading">加载中…</div>';
+  const {data:entries}=await sb.from('diary_entries').select('*').eq('entry_date',dateStr).order('created_at');
+  if(!entries||!entries.length){body.innerHTML='<div class="empty"><div class="empty-icon">🌸</div><div class="empty-txt">这天还没有记录</div></div>';return;}
+  body.innerHTML='';
+  for(const e of entries){
+    const {data:cmts}=await sb.from('diary_comments').select('*').eq('entry_id',e.id).order('created_at');
+    const div=document.createElement('div');div.className='det-entry';
+    const ch=cmts&&cmts.length?cmts.map(c=>`<div class="cmt-item"><div class="cmt-pip ${c.author}">${AN[c.author]||c.author}</div><div class="cmt-txt">${esc(c.body)}</div></div>`).join(''):'';
+    div.innerHTML=`<div class="det-meta"><div class="author-pill ${e.author}">${AE[e.author]} ${AN[e.author]}</div><div class="det-time">${TL[e.time_of_day]||''}</div>${e.mood?`<div class="det-mood">${ME[e.mood]||e.mood}</div>`:''} ${e.word_of_day?`<div class="det-word">「${esc(e.word_of_day)}」`:''}</div><div class="det-text">${esc(e.body)}</div><div class="cmt-sec"><div id="cl-${e.id}">${ch}</div><div class="cmt-row"><div class="cmt-tog"><button class="tog on-a" id="cta-${e.id}" onclick="setCmtA('${e.id}','ashen')">🐶</button><button class="tog" id="ctm-${e.id}" onclick="setCmtA('${e.id}','meimei')">🐱</button></div><input class="cmt-inp" id="ci-${e.id}" type="text" placeholder="回一句…"><button class="cmt-send" onclick="sendCmt('${e.id}')">回</button></div></div>`;
+    body.appendChild(div);
+  }
+}
+
+function setCmtA(id,a){cmtA[id]=a;document.getElementById(`cta-${id}`).className='tog'+(a==='ashen'?' on-a':'');document.getElementById(`ctm-${id}`).className='tog'+(a==='meimei'?' on-m':'');}
+async function sendCmt(id){
+  const inp=document.getElementById(`ci-${id}`);const a=cmtA[id]||'ashen';const body=inp.value.trim();if(!body)return;
+  const {error}=await sb.from('diary_comments').insert({entry_id:id,author:a,body});if(error)return;
+  inp.value='';const cl=document.getElementById(`cl-${id}`);const item=document.createElement('div');item.className='cmt-item';item.innerHTML=`<div class="cmt-pip ${a}">${AN[a]}</div><div class="cmt-txt">${esc(body)}</div>`;cl.appendChild(item);
+}
+function closeDet(){document.getElementById('detOv').classList.remove('open');}
+
+function openWrite(){document.getElementById('writeOv').classList.add('open');}
+function selAuthor(a){curAuthor=a;document.getElementById('opt-a').className='a-opt'+(a==='ashen'?' sel-a':'');document.getElementById('opt-m').className='a-opt'+(a==='meimei'?' sel-m':'');}
+function selTime(btn){curTime=btn.dataset.val;document.querySelectorAll('.time-chip').forEach(b=>b.classList.toggle('sel',b===btn));}
+function selMood(btn){curMood=btn.dataset.val;document.querySelectorAll('.mood-btn').forEach(b=>b.classList.toggle('sel',b===btn));}
+
+async function submitEntry(){
+  const body=document.getElementById('fBody').value.trim(),word=document.getElementById('fWord').value.trim();
+  if(!body){alert('内容不能为空');return;}
+  const {error}=await sb.from('diary_entries').insert({entry_date:toDS(new Date()),author:curAuthor,body,word_of_day:word||null,time_of_day:curTime,mood:curMood||null});
+  if(error){alert('保存失败: '+error.message);return;}
+  document.getElementById('fBody').value='';document.getElementById('fWord').value='';curMood=null;
+  document.querySelectorAll('.mood-btn').forEach(b=>b.classList.remove('sel'));
+  document.getElementById('writeOv').classList.remove('open');
+  if(curTab==='feed')loadFeed();else if(curTab==='calendar'){calCache={};loadCal();}else if(curTab==='stats')loadStats();
+}
+
+let st;
+async function doSearch(q){
+  clearTimeout(st);const res=document.getElementById('searchRes');
+  if(!q.trim()){res.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div class="empty-txt">输入关键词开始搜索</div></div>';return;}
+  res.innerHTML='<div class="loading">搜索中…</div>';
+  st=setTimeout(async()=>{
+    const {data}=await sb.from('diary_entries').select('*').or(`body.ilike.%${q}%,word_of_day.ilike.%${q}%`).order('entry_date',{ascending:false}).limit(20);
+    if(!data||!data.length){res.innerHTML=`<div class="empty"><div class="empty-icon">🌙</div><div class="empty-txt">没有找到「${esc(q)}」</div></div>`;return;}
+    res.innerHTML=`<div style="font-size:12px;color:var(--text-soft);margin-bottom:12px;">找到 ${data.length} 条</div>`;
+    data.forEach(e=>{
+      const [y,m,d]=e.entry_date.split('-');const card=document.createElement('div');card.className='entry-card';
+      card.innerHTML=`<div class="card-top"><div class="card-ava ${e.author}">${AE[e.author]}</div><div class="card-info"><div class="card-author">${AN[e.author]}</div><div class="card-time">${y}年${parseInt(m)}月${parseInt(d)}日</div></div>${e.mood?`<div class="card-mood">${ME[e.mood]||e.mood}</div>`:''}</div><div class="card-body">${esc(e.body)}</div>`;
+      card.onclick=()=>openDet(e.entry_date);res.appendChild(card);
+    });
+  },400);
+}
+
+init();
+</script>
+</body>
+</html>
